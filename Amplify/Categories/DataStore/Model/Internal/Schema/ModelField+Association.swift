@@ -107,7 +107,7 @@ extension ModelField {
         return association != nil
     }
 
-    /// If the field represents an association returns the `ModelName`.
+    /// If the field represents an association returns the name of the model
     /// - seealso: `ModelFieldType`
     /// - seealso: `ModelFieldAssociation`
     /// - Warning: Although this has `public` access, it is intended for internal use and should not be used directly

@@ -27,6 +27,12 @@ public struct ModelRegistry {
             Array(modelTypes.values)
         }
     }
+    
+    public static var modelSchemas: [ModelSchema] {
+        concurrencyQueue.sync {
+            Array(modelSchemaMapping.values)
+        }
+    }
 
     public static var modelSchemas: [ModelSchema] {
         concurrencyQueue.sync {
@@ -42,10 +48,25 @@ public struct ModelRegistry {
             }
 
             modelDecoders[modelType.modelName] = modelDecoder
-
+            modelSchemaMapping[modelType.modelName] = modelType.schema
             modelTypes[modelType.modelName] = modelType
 
             modelSchemaMapping[modelType.modelName] = modelType.schema
+        }
+    }
+
+    public static func register(modelName: ModelName,
+                                modelSchema: ModelSchema,
+                                modelType: Model.Type,
+                                jsonDecoder: @escaping (String, JSONDecoder?) throws -> Model) {
+        concurrencyQueue.sync {
+            let modelDecoder: ModelDecoder = { jsonString, decoder in
+                return try jsonDecoder(jsonString, decoder)
+            }
+
+            modelSchemaMapping[modelName] = modelSchema
+            modelTypes[modelName] = modelType
+            modelDecoders[modelName] = modelDecoder
         }
     }
 

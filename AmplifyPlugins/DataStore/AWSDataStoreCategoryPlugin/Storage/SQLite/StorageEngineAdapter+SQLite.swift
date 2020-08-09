@@ -96,10 +96,17 @@ final class SQLiteStorageEngineAdapter: StorageEngineAdapter {
         }
     }
 
-    func save<M: Model>(_ model: M, condition: QueryPredicate? = nil, completion: DataStoreCallback<M>) {
+    func save<M: Model>(_ model: M, condition: QueryPredicate? = nil, completion: @escaping DataStoreCallback<M>) {
+         save(model, schema: model.schema, where: condition, completion: completion)
+     }
+
+    func save<M: Model>(_ model: M,
+                        schema: ModelSchema,
+                        where condition: QueryPredicate? = nil,
+                        completion: DataStoreCallback<M>) {
         do {
             let modelType = type(of: model)
-            let modelExists = try exists(modelType.schema, withId: model.id)
+            let modelExists = try exists(schema, withId: model.id)
 
             if !modelExists {
                 if condition != nil {
@@ -110,13 +117,13 @@ final class SQLiteStorageEngineAdapter: StorageEngineAdapter {
                     return
                 }
 
-                let statement = InsertStatement(model: model, modelSchema: modelType.schema)
+                let statement = InsertStatement(model: model, schema: schema)
                 _ = try connection.prepare(statement.stringValue).run(statement.variables)
             }
 
             if modelExists {
                 if condition != nil {
-                    let modelExistsWithCondition = try exists(modelType.schema, withId: model.id, predicate: condition)
+                    let modelExistsWithCondition = try exists(schema, withId: model.id, predicate: condition)
                     if !modelExistsWithCondition {
                         let dataStoreError = DataStoreError.invalidCondition(
                         "Save failed due to condition did not match existing model instance.",
@@ -133,7 +140,7 @@ final class SQLiteStorageEngineAdapter: StorageEngineAdapter {
             }
 
             // load the recent saved instance and pass it back to the callback
-            query(modelType, predicate: field("id").eq(model.id)) {
+            query(modelType, schema: schema, predicate: field("id").eq(model.id)) {
                 switch $0 {
                 case .success(let result):
                     if let saved = result.first {
@@ -193,8 +200,47 @@ final class SQLiteStorageEngineAdapter: StorageEngineAdapter {
                          sort: QuerySortInput? = nil,
                          paginationInput: QueryPaginationInput? = nil,
                          completion: DataStoreCallback<[M]>) {
+        query(modelType,
+              schema: modelType.schema,
+              predicate: predicate,
+              paginationInput: paginationInput,
+              completion: completion)
+    }
+
+    func query<M>(_ modelType: M.Type,
+                  predicate: QueryPredicate?,
+                  paginationInput: QueryPaginationInput?,
+                  additionalStatements: String?,
+                  completion: (DataStoreResult<[M]>) -> Void) where M: Model {
+        query(modelType,
+              schema: modelType.schema,
+              predicate: predicate,
+              paginationInput: paginationInput,
+              additionalStatements: additionalStatements,
+            completion: completion)
+    }
+
+    func query<M>(_ modelType: M.Type,
+                  schema: ModelSchema,
+                  predicate: QueryPredicate?,
+                  paginationInput: QueryPaginationInput?,
+                  completion: (DataStoreResult<[M]>) -> Void) where M: Model {
+        query(modelType,
+              schema: schema,
+              predicate: predicate,
+              paginationInput: paginationInput,
+              additionalStatements: nil,
+              completion: completion)
+    }
+
+    func query<M: Model>(_ modelType: M.Type,
+                         schema: ModelSchema,
+                         predicate: QueryPredicate? = nil,
+                         paginationInput: QueryPaginationInput? = nil,
+                         additionalStatements: String? = nil,
+                         completion: DataStoreCallback<[M]>) {
         do {
-            let statement = SelectStatement(from: modelType.schema,
+            let statement = SelectStatement(from: schema,
                                             predicate: predicate,
                                             sort: sort,
                                             paginationInput: paginationInput)

@@ -12,6 +12,7 @@ import AWSPluginsCore
 
 // swiftlint:disable type_body_length
 final class StorageEngine: StorageEngineBehavior {
+
     // TODO: Make this private once we get a mutation flow that passes the type of mutation as needed
     let storageAdapter: StorageEngineAdapter
     private let dataStoreConfiguration: DataStoreConfiguration
@@ -130,12 +131,16 @@ final class StorageEngine: StorageEngineBehavior {
         try storageAdapter.setUp(modelSchemas: modelSchemas)
     }
 
-    func save<M: Model>(_ model: M, condition: QueryPredicate? = nil, completion: @escaping DataStoreCallback<M>) {
+    public func save<M: Model>(_ model: M,
+                               schema: ModelSchema,
+                               where condition: QueryPredicate? = nil,
+                               completion: @escaping DataStoreCallback<M>) {
+
         // TODO: Refactor this into a proper request/result where the result includes metadata like the derived
         // mutation type
         let modelExists: Bool
         do {
-            modelExists = try storageAdapter.exists(M.schema, withId: model.id, predicate: nil)
+            modelExists = try storageAdapter.exists(schema, withId: model.id, predicate: nil)
         } catch {
             let dataStoreError = DataStoreError.invalidOperation(causedBy: error)
             completion(.failure(dataStoreError))
@@ -152,7 +157,7 @@ final class StorageEngine: StorageEngineBehavior {
         }
 
         let wrappedCompletion: DataStoreCallback<M> = { result in
-            guard type(of: model).schema.isSyncable, let syncEngine = self.syncEngine else {
+            guard schema.isSyncable, let syncEngine = self.syncEngine else {
                 completion(result)
                 return
             }
@@ -174,7 +179,11 @@ final class StorageEngine: StorageEngineBehavior {
             }
         }
 
-        storageAdapter.save(model, condition: condition, completion: wrappedCompletion)
+        storageAdapter.save(model, schema: schema, where: condition, completion: wrappedCompletion)
+    }
+
+    func save<M: Model>(_ model: M, condition: QueryPredicate? = nil, completion: @escaping DataStoreCallback<M>) {
+        save(model, schema: model.schema, where: condition, completion: completion)
     }
 
     func delete<M: Model>(_ modelType: M.Type,
@@ -327,12 +336,25 @@ final class StorageEngine: StorageEngineBehavior {
         }
     }
 
+    func query<M>(_ modelType: M.Type,
+                  schema: ModelSchema,
+                  predicate: QueryPredicate?,
+                  paginationInput: QueryPaginationInput?,
+                  completion: (DataStoreResult<[M]>) -> Void) where M: Model {
+        return storageAdapter.query(modelType,
+                                    schema: schema,
+                                    predicate: predicate,
+                                    paginationInput: paginationInput,
+                                    completion: completion)
+    }
+
     func query<M: Model>(_ modelType: M.Type,
                          predicate: QueryPredicate? = nil,
                          sort: QuerySortInput? = nil,
                          paginationInput: QueryPaginationInput? = nil,
                          completion: DataStoreCallback<[M]>) {
         return storageAdapter.query(modelType,
+                                    schema: modelType.schema,
                                     predicate: predicate,
                                     sort: sort,
                                     paginationInput: paginationInput,
