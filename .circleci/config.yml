@@ -4,7 +4,7 @@ version: 2.1
 
 defaults: &defaults
   macos:
-    xcode: '11.4.1'
+    xcode: '12.0.0'
   working_directory: ~/amplify-ios
   environment:
     BUNDLE_PATH: vendor/bundle
@@ -113,7 +113,7 @@ jobs:
           command: xcodebuild build-for-testing -workspace Amplify.xcworkspace -scheme Amplify -sdk iphonesimulator -destination "${destination}" | xcpretty
       - run:
           name: Test amplify
-          command: xcodebuild test -enableThreadSanitizer NO -workspace Amplify.xcworkspace -scheme Amplify -sdk iphonesimulator -destination "${destination}" | xcpretty --simple --color --report junit
+          command: xcodebuild test -workspace Amplify.xcworkspace -scheme Amplify -sdk iphonesimulator -destination "${destination}" | xcpretty --simple --color --report junit
       - store_test_results:
           path: build/reports
 
